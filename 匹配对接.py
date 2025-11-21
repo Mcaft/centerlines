@@ -590,7 +590,7 @@ def compute_disparity_with_resample(lineL, lineR):
         num_points = max(ptsL.shape[0], ptsR.shape[0])
         ptsL_resampled = resample_line(ptsL, num_points)
         ptsR_resampled = resample_line(ptsR, num_points)
-        disp = ptsL_resampled[:, 0] - ptsR_resampled[:, 0]
+        disp = ptsL_resampled[:, 0] - ptsR_resampled[:, 0]+P2[0][2]-P1[0][2]
         disparities.append(disp)
     return disparities
 
@@ -700,6 +700,7 @@ if __name__ == "__main__":
     print(f"右图提取到 {len(right_lines)} 条激光线")
 
     # # 可视化原始检测结果
+    # cv2.imwrite(left_rectified)
     # visualize_results(left_rectified, left_lines, 'Left Image')
     # visualize_results(right_rectified, right_lines, 'Right Image')
 
@@ -729,7 +730,21 @@ if __name__ == "__main__":
     cv2.imwrite("img_line/right_line.bmp",line_R)
 
     line_dis=compute_disparity_with_resample(left_lines, right_lines)
+
+    def save_lines(lines, filename):
+        with open(filename, 'w') as f:
+            for i, line in enumerate(lines):
+                np.savetxt(f, line, fmt='%.2f',
+                          header=f'Line {i+1}', comments='# ',
+                          delimiter=',')
+                
+    save_lines(line_dis, 'disp_lines.csv')
+    save_lines(left_lines, 'left_lines.csv')
+    save_lines(right_lines, 'right_lines.csv')
+
     simple_disp=disparity_lines_to_map(left_rectified.shape,left_lines,line_dis)
+
+
 
     # 转换为灰度图用于SGBM
     left_gray = cv2.cvtColor(line_L, cv2.COLOR_BGR2GRAY)
@@ -743,10 +758,6 @@ if __name__ == "__main__":
     # delta_cx=P1[0][2]-P2[0][2]
     # sparse_disp, dense_disp = sift_disparity(line_L, line_R,delta_cx)
 
-
-
-
-
     # 提取匹配点
     print("提取匹配点...")
     pts_left, pts_right = extract_matched_points(sbgm_disp, left_lines, right_gray.shape)
@@ -755,7 +766,7 @@ if __name__ == "__main__":
     remap_disp=generate_disparity_map_from_matches(pts_left, pts_right,left_rectified.shape)
 
 
-    disparity=remap_disp
+    disparity=simple_disp
     visualize_disparity(disparity)
     # 可视化匹配点
     # visualize_matched_points(left_rectified, right_rectified, pts_left, pts_right)
@@ -771,8 +782,9 @@ if __name__ == "__main__":
     colors =cv2.cvtColor(colorR_rectified,cv2.COLOR_BGR2RGB)
 
     # 设定最小视差阈值（视差小于此值的点视为太远）
-    min_disp = 0  # 根据场景调整，值越小，保留的深度越远
+    min_disp = 0 # 根据场景调整，值越小，保留的深度越远
     mask = disparity > min_disp
+    print(disparity)
     out_points = points_3D[mask]
     out_colors = colors[mask]
 
